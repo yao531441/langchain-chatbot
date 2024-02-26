@@ -3,24 +3,23 @@ import utils
 import streamlit as st
 from streaming import StreamHandler
 
-from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import PyPDFLoader
+from langchain_openai import ChatOpenAI
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.memory import ConversationBufferMemory
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains import ConversationalRetrievalChain
-from langchain.vectorstores import DocArrayInMemorySearch
+from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 st.set_page_config(page_title="ChatPDF", page_icon="📄")
 st.header('Chat with your documents')
 st.write('Has access to custom documents and can respond to user queries by referring to the content within those documents')
-st.write('[![view source code ](https://img.shields.io/badge/view_source_code-gray?logo=github)](https://github.com/shashankdeshpande/langchain-chatbot/blob/master/pages/4_%F0%9F%93%84_chat_with_your_documents.py)')
 
 class CustomDataChatbot:
 
     def __init__(self):
-        utils.configure_openai_api_key()
-        self.openai_model = "gpt-3.5-turbo"
+        #utils.configure_openai_api_key()
+        self.openai_model = "llama-2-7b-chat-hf"
 
     def save_file(self, file):
         folder = 'tmp'
@@ -34,6 +33,10 @@ class CustomDataChatbot:
 
     @st.spinner('Analyzing documents..')
     def setup_qa_chain(self, uploaded_files):
+        if ('RECDP_CACHE_HOME' not in os.environ) or (not os.environ['RECDP_CACHE_HOME']):
+            os.environ['RECDP_CACHE_HOME'] = os.path.join(os.getcwd(), "models")
+        #embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
+        embedding_model_name = "all-MiniLM-L6-v2"
         # Load documents
         docs = []
         for file in uploaded_files:
@@ -49,8 +52,14 @@ class CustomDataChatbot:
         splits = text_splitter.split_documents(docs)
 
         # Create embeddings and store in vectordb
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        vectordb = DocArrayInMemorySearch.from_documents(splits, embeddings)
+        local_embedding_model_path = os.path.join(os.environ['RECDP_CACHE_HOME'], embedding_model_name)
+        print(local_embedding_model_path)
+        if os.path.exists(local_embedding_model_path):
+            embeddings = HuggingFaceEmbeddings(model_name=local_embedding_model_path)
+        else:
+            raise FileNotFoundError(local_embedding_model_path)
+        #embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        vectordb = Chroma.from_documents(splits, embeddings)
 
         # Define retriever
         retriever = vectordb.as_retriever(
@@ -65,7 +74,7 @@ class CustomDataChatbot:
         )
 
         # Setup LLM and QA chain
-        llm = ChatOpenAI(model_name=self.openai_model, temperature=0, streaming=True)
+        llm = ChatOpenAI(openai_api_base = "http://localhost:8000/v1", model_name=self.openai_model, openai_api_key="not_needed", temperature=0.2, streaming=True)
         qa_chain = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, memory=memory, verbose=True)
         return qa_chain
 

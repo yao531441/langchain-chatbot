@@ -10,13 +10,12 @@ from langchain.callbacks import StreamlitCallbackHandler
 st.set_page_config(page_title="ChatWeb", page_icon="🌐")
 st.header('Chatbot with Internet Access')
 st.write('Equipped with internet access, enables users to ask questions about recent events')
-st.write('[![view source code ](https://img.shields.io/badge/view_source_code-gray?logo=github)](https://github.com/shashankdeshpande/langchain-chatbot/blob/master/pages/3_%F0%9F%8C%90_chatbot_with_internet_access.py)')
 
 class ChatbotTools:
 
     def __init__(self):
-        utils.configure_openai_api_key()
-        self.openai_model = "gpt-3.5-turbo"
+        #utils.configure_openai_api_key()
+        self.openai_model = "llama-2-7b-chat-hf"
 
     def setup_agent(self):
         # Define tool
@@ -30,7 +29,7 @@ class ChatbotTools:
         ]
 
         # Setup LLM and Agent
-        llm = ChatOpenAI(model_name=self.openai_model, streaming=True)
+        llm = ChatOpenAI(openai_api_base = "http://localhost:8000/v1", model_name=self.openai_model, openai_api_key="not_needed", streaming=True)
         agent = initialize_agent(
             tools=tools,
             llm=llm,
