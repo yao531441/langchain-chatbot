@@ -2,28 +2,16 @@ import os
 import streamlit as st
 
 #decorator
-def enable_chat_history(func):
+def enable_chat_history(current_page):
     # to clear chat history after swtching chatbot
-    current_page = func.__qualname__
+    print(current_page)
     if "current_page" not in st.session_state:
         st.session_state["current_page"] = current_page
-    if st.session_state["current_page"] != current_page:
-        try:
-            st.cache_resource.clear()
-            del st.session_state["current_page"]
-            del st.session_state["messages"]
-        except:
-            pass
-
-    # to show chat history on ui
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
-    for msg in st.session_state["messages"]:
-        st.chat_message(msg["role"]).write(msg["content"])
-
-    def execute(*args, **kwargs):
-        func(*args, **kwargs)
-    return execute
+    if current_page not in st.session_state:
+        st.session_state[current_page] = {}
+    if 'messages' not in st.session_state[current_page]:
+        st.session_state[current_page]['messages'] = [{"role": "assistant", "content": "Ask me a question "}]
+    return st.session_state[current_page]['messages']
 
 def display_msg(msg, author):
     """Method to display message on the UI
