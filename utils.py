@@ -4,7 +4,6 @@ import streamlit as st
 #decorator
 def enable_chat_history(current_page):
     # to clear chat history after swtching chatbot
-    print(current_page)
     if "current_page" not in st.session_state:
         st.session_state["current_page"] = current_page
     if current_page not in st.session_state:

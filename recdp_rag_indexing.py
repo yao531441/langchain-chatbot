@@ -1,4 +1,4 @@
-from pyrecdp.primitives.operations import DirectoryLoader, DocumentSplit, DocumentIngestion
+from pyrecdp.primitives.operations import DirectoryLoader, DocumentSplit, DocumentIngestion, UrlLoader
 from pyrecdp.LLM import TextPipeline
 import os
 
@@ -15,11 +15,19 @@ def load_embedding_path():
     else:
         raise FileNotFoundError(local_embedding_model_path)
 
-def main(folder, db_location): 
+def main(folder, db_location, type): 
     embeddings_path = load_embedding_path()
     pipeline = TextPipeline()
+    if type == 'document':
+        loader = DirectoryLoader(folder, glob="**/*.pdf")
+    elif type == 'url':
+        input_texts = folder.split(";")
+        target_urls = [url.strip() for url in input_texts if url != ""]
+        loader = UrlLoader(urls=target_urls, max_depth=1)
+    else:
+        raise ValueError(f'Unable to recognize input type as {type}')
     ops = [
-        DirectoryLoader(folder, glob="**/*.pdf"),
+        loader,
         DocumentSplit(),
         DocumentIngestion(
             vector_store='chroma',
@@ -48,5 +56,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--db_location", default="intel_on_db", type=str, help="folder to do rag indexing"
     )
+    parser.add_argument(
+        "--type", default="document", type=str, choices=['document', 'url']
+    )
     args = parser.parse_args()
-    main(args.folder, args.db_location)
+    main(args.folder, args.db_location, args.type)

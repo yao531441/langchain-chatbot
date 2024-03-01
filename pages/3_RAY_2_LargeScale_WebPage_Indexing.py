@@ -13,27 +13,23 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import glob
 import subprocess
 
-st.set_page_config(page_title="Document Indexing", page_icon="📄")
-st.header('Large Scale Document Indexing')
+st.set_page_config(page_title="Document Indexing", page_icon="🌐")
+st.header('Large Scale Webpages Indexing')
 st.write('Build Knowledge Base based on your documents')
 
 class Custombot:
     def __init__(self):
         self.openai_model = "mistral-7b-instruct-v0.2"
-        self.history_messages = utils.enable_chat_history('ray_large_chat')
-
-    def save_file(self, folder, file):
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        self.history_messages = utils.enable_chat_history('ray_large_web_chat')
         
-        file_path = f'./{folder}/{file.name}'
-        with open(file_path, 'wb') as f:
-            f.write(file.getvalue())
-        return file_path
+    def get_actual_links(self, links_str):
+        import re
+        return re.findall('(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-&?=%.]+', links_str)
+
     
-    def document_indexing(self, files_path, db_location):
+    def document_indexing(self, link_list, db_location):
         # Run the script file
-        process = subprocess.Popen(['python', 'my_app/langchain-chatbot/recdp_rag_indexing.py', '--folder', files_path, '--db_location', db_location], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(['python', 'my_app/langchain-chatbot/recdp_rag_indexing.py', '--folder', f"{';'.join(link_list)}", '--db_location', db_location, '--type', 'url'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         with st.expander("Open to see progress"):
             #stdout, stderr = result.communicate()
             with process.stdout:
@@ -81,44 +77,28 @@ class Custombot:
         embeddings = self.load_embedding()
         llm = ChatOpenAI(openai_api_base = "http://localhost:8000/v1", model_name=self.openai_model, openai_api_key="not_needed", temperature=0.2, streaming=True, max_tokens=512)
         
-        folder = st.text_input("Server File Location:", placeholder="./large_scale_data/")
-        if not folder:
-            st.error("Please confirm the location of files")
-            st.stop()
-
-        to_find = os.path.join(folder, '*.pdf')
-        to_find_db = f"{folder}_db"
-        num_files = len(list(glob.glob(to_find)))
-        db_location = None
-        for i in glob.glob(to_find_db):
-            db_location = i
-
-        with st.expander("Upload more documents"):
-            # User Inputs
-            uploaded_files = st.file_uploader(label='Upload PDF files', type=['pdf'], accept_multiple_files=True)
-            if uploaded_files:
-                st.write(f"System Log: Received new files.")
-                file_path = []
-                for file in uploaded_files:
-                    file_path.append(self.save_file(folder, file))
-                st.write(f"System Log: Saved files.")
-            num_files = len(list(glob.glob(to_find)))
-
-        if num_files > 0:
-            col1, col2 = st.columns((5, 1))
-            col1.write(f"{num_files} files uploaded for Document Indexing, click 'Start Index' to create index.")
-            if col2.button("Start Index"):
-                db_location = db_location if db_location is not None else f"{folder}_db"
-                with st.spinner("Start Indexing..."):
-                    self.document_indexing(folder, db_location)
-                    st.write(f"Index completed, file saved to {db_location}.")
-                for i in glob.glob(db_location):
-                    db_location = i
+        folder = "webpage_db"
+        db_location = folder if len(list(glob.glob(folder))) == 1 else None
+        
+        with st.form("my-form", clear_on_submit=True):
+            links = st.text_input(f"Provide Webpage links")
+            submitted = st.form_submit_button()
+        
+        if submitted and links:
+            link_list = self.get_actual_links(links)
+            with st.expander("Input URL list is"):
+                st.write(link_list)
+            db_location = db_location if db_location is not None else folder
+            with st.spinner("Start Indexing..."):
+                self.document_indexing(link_list, db_location)
+                st.write(f"Index completed, file saved to {db_location}.")
+            for i in glob.glob(db_location):
+                db_location = i
 
         if db_location is not None:
             st.write(f"Pre-generated {db_location} exists, you can start query.")
-            if "qa_chain_31" not in st.session_state.keys(): # Initialize the chat engine
-                st.session_state.qa_chain_31 = self.setup_qa_chain(db_location, embeddings, llm)
+            if "qa_chain_32" not in st.session_state.keys(): # Initialize the chat engine
+                st.session_state.qa_chain_32 = self.setup_qa_chain(db_location, embeddings, llm)
             if prompt := st.chat_input("Your question"): # Prompt for user input and save to chat history
                 self.history_messages.append({"role": "user", "content": prompt})
                 with st.chat_message('user'):
@@ -127,7 +107,7 @@ class Custombot:
                 with st.chat_message("assistant"):
                     with st.spinner("Thinking..."):
                         st_cb = StreamHandler(st.empty())
-                        response = st.session_state.qa_chain_31.run(prompt, callbacks=[st_cb])
+                        response = st.session_state.qa_chain_32.run(prompt, callbacks=[st_cb])
                         self.history_messages.append({"role": "assistant", "content": response})
 
 if __name__ == "__main__":
